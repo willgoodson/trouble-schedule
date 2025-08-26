@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Create Weekly Schedule</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    fieldset { margin-bottom: 20px; padding: 10px; border-radius: 8px; }
+    legend { font-weight: bold; }
+    .slot { margin: 5px 0; }
+    select { margin-right: 10px; }
+    button { margin: 5px 0; }
+  </style>
+</head>
+<body>
+  <h1>Create Weekly Schedule</h1>
+
+  <label for="effective_date">Effective Date:</label>
+  <input type="date" id="effective_date" required>
+
+  <form id="scheduleForm">
+    <!-- Weekdays -->
+    <fieldset>
+      <legend>Monday</legend>
+      <div id="slots_0"></div>
+      <button type="button" onclick="addSlot(0)">+ Add Slot</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Tuesday</legend>
+      <div id="slots_1"></div>
+      <button type="button" onclick="addSlot(1)">+ Add Slot</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Wednesday</legend>
+      <div id="slots_2"></div>
+      <button type="button" onclick="addSlot(2)">+ Add Slot</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Thursday</legend>
+      <div id="slots_3"></div>
+      <button type="button" onclick="addSlot(3)">+ Add Slot</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Friday</legend>
+      <div id="slots_4"></div>
+      <button type="button" onclick="addSlot(4)">+ Add Slot</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Saturday</legend>
+      <div id="slots_5"></div>
+      <button type="button" onclick="addSlot(5)">+ Add Slot</button>
+    </fieldset>
+
+    <button type="submit">Submit Schedule</button>
+  </form>
+
+  <script>
+    const hours = [...Array(24).keys()]; // 0–23
+    const capacities = [...Array(10).keys()].map(x => x + 1);
+
+    function addSlot(weekday) {
+      const container = document.getElementById(`slots_${weekday}`);
+
+      const div = document.createElement("div");
+      div.className = "slot";
+
+      const hourSelect = document.createElement("select");
+      hours.forEach(h => {
+        const opt = document.createElement("option");
+        opt.value = h;
+        opt.textContent = `${String(h).padStart(2,"0")}:00`;
+        hourSelect.appendChild(opt);
+      });
+
+      const capSelect = document.createElement("select");
+      capacities.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        capSelect.appendChild(opt);
+      });
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.textContent = "Remove";
+      removeBtn.onclick = () => div.remove();
+
+      div.appendChild(hourSelect);
+      div.appendChild(capSelect);
+      div.appendChild(removeBtn);
+
+      container.appendChild(div);
+    }
+
+    document.getElementById("scheduleForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+
+      const effectiveDate = document.getElementById("effective_date").value;
+      if (!effectiveDate) {
+        alert("Please select an effective date.");
+        return;
+      }
+
+      const schedule = {
+        effective_date: effectiveDate,
+        slots: []
+      };
+
+      for (let weekday = 0; weekday < 7; weekday++) {
+        document.querySelectorAll(`#slots_${weekday} .slot`).forEach(slot => {
+          const hour = slot.querySelector("select:nth-child(1)").value;
+          const capacity = slot.querySelector("select:nth-child(2)").value;
+          schedule.slots.push({
+            weekday,
+            hour: parseInt(hour),
+            capacity: parseInt(capacity)
+          });
+        });
+      }
+
+      fetch("/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(schedule)
+      })
+      .then(r => r.json())
+      .then(d => console.log("Server response:", d))
+      .catch(err => console.error("Error:", err));
+    });
+  </script>
+</body>
+</html>

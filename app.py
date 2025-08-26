@@ -1,51 +1,6 @@
-from flask import Flask, request, render_template, g
+from flask import Flask, request, render_template, g, redirect
 import datetime as dt
 import sqlite3
-
-AVAILABILITY = [
-    #Monday
-    [
-        (dt.timedelta(hours=8), 1),
-        (dt.timedelta(hours=10), 2),
-        (dt.timedelta(hours=13), 3),
-        (dt.timedelta(hours=15), 4)
-    ],
-    #Tuesday
-    [
-        (dt.timedelta(hours=8), 2),
-        (dt.timedelta(hours=10), 3),
-        (dt.timedelta(hours=13), 3),
-        (dt.timedelta(hours=15), 4)
-    ],
-    #Wednesday
-    [
-        (dt.timedelta(hours=8), 2),
-        (dt.timedelta(hours=10), 3),
-        (dt.timedelta(hours=13), 3),
-        (dt.timedelta(hours=15), 4)
-    ],
-    #Thursday
-   [
-        (dt.timedelta(hours=8), 2),
-        (dt.timedelta(hours=10), 3),
-        (dt.timedelta(hours=13), 3),
-        (dt.timedelta(hours=15), 4)
-    ],
-    #Friday
-    [
-        (dt.timedelta(hours=8), 2),
-        (dt.timedelta(hours=10), 3),
-        (dt.timedelta(hours=13), 3),
-        (dt.timedelta(hours=15), 4)
-    ],
-    #Saturday
-    [
-        (dt.timedelta(hours=8), 1),
-        (dt.timedelta(hours=10), 1),
-        (dt.timedelta(hours=13), 1),
-        (dt.timedelta(hours=15), 1)
-    ]
-]
 
 DATABASE = 'scheduler.db'
 
@@ -69,7 +24,17 @@ def init_db():
             time      TEXT NOT NULL,
             ordinal   INTEGER NOT NULL,
             available INTEGER NOT NULL,
-            UNIQUE(date, time, ordinal)
+            UNIQUE(time, time, ordinal)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS schedules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            weekday INTEGER NOT NULL,
+            ordinals INTEGER NOT NULL,
+            start TEXT NOT NULL,
+            end TEXT,
+            UNIQUE(weekday, start, end)
         )
     """)
     db.commit()
@@ -79,28 +44,77 @@ def populate_dates(start_date, days=7):
     '''Populate Table with Set Amount Days From Start Date. Default: 7'''
     # Open Database Connection
     db = get_db()
+
     # Create and Insert Time Slots for All Requested Days into Database
     for offset in range(days):
-        # Get Day and Ensure it is Within Scheduled Availability
         day = start_date + dt.timedelta(days=offset)
         weekday = day.weekday()
-        if weekday >= len(AVAILABILITY):
-            continue
-        # Loop Over Available Slots Per Time and Insert Slots into Table
-        for time_delta, capacity in AVAILABILITY[weekday]:
-            slot_time = day.replace(hour=0, minute=0, second=0) + time_delta
+
+        # Pull schedules for this weekday
+        rows = db.execute("""
+            SELECT ordinals, start, end
+            FROM schedules
+            WHERE weekday = ?
+            AND date(?) BETWEEN date(start) AND date(COALESCE(end, ?))
+        """, (weekday, day.date(), day.date())).fetchall()
+
+        # Loop Over Schedules and Create and Insert Time Slots into Database
+        for row in rows:
+            capacity, start_str, end_str = row
+            start_time = dt.datetime.combine(day, dt.datetime.fromisoformat(start_str).time())
             for ordinal in range(capacity):
                 db.execute("""
                     INSERT OR IGNORE INTO time_slots (time, ordinal, available)
                     VALUES (?, ?, 1)
-                """, (slot_time, ordinal))
+                """, (start_time, ordinal))
     db.commit()
+
+def refresh_schedule(date):
+    db = get_db()
+    # db.execute("""
+    #            DELETE FROM schedules WHERE start < ?;
+    #            """, (date,))
+    db.execute("""
+               DELETE FROM schedules WHERE end < ?;
+               """, (dt.datetime.today().strftime("%Y-%m-%d"),))
+    db.execute("""
+               DELETE FROM time_slots WHERE time > ?;
+               """, (date.strftime("%Y-%m-%d %H:%M:%S"),))
+    db.commit()
+    populate_dates(dt.datetime.today(), 28)
 
 
 @app.route('/')
 def default():
     '''Default Root. Renders the HTML Template.'''
     return render_template('index.html'), 200
+
+@app.route('/admin', methods=['GET', 'POST'])
+def admin_dash():
+    '''Admin Route. Renders HTML for Admin Dashboard.'''
+    if request.method == 'GET':
+        return render_template('admin.html'), 200
+    elif request.method == 'POST':
+        db = get_db()
+        eff_date = dt.datetime.strptime(request.get_json()['effective_date'], "%Y-%m-%d")
+        db.execute("""
+                    UPDATE schedules
+                    SET end = ?
+                    WHERE end IS NULL;
+                   """, (eff_date.strftime("%Y-%m-%d %H:%M:%S"),))
+        for slot in request.get_json()['slots']:
+            db.execute("""
+                       INSERT INTO schedules (weekday, ordinals, start)
+                       VALUES (?, ?, ?);
+                       """, (slot['weekday'], slot['capacity'], (eff_date + dt.timedelta(hours=slot['hour'])).strftime("%Y-%m-%d %H:%M:%S")))
+        db.commit()
+        refresh_schedule(eff_date)
+
+        return ('okay', 201)
+
+@app.route('/api/test', methods=['POST'])
+def test():
+    pass
 
 @app.route('/data')
 def data():

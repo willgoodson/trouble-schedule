@@ -5,12 +5,15 @@
     --font-color: #2e3440;
     --available-status: darkseagreen;
     --unavailable-status: palevioletred;
-    /* --background-base: #434c5e;
+}
+
+[data-theme="dark"] {
+    --background-base: #434c5e;
     --background-highlight: #3b4252;
     --background-blocked: #2e3440;
     --font-color: #d8dee9;
     --available-status: seagreen;
-    --unavailable-status: indianred; */
+    --unavailable-status: indianred;
 }
 
 * {
@@ -105,4 +108,21 @@ nav {
     border: solid 2px var(--background-blocked);
     border-radius: 10px;
     padding: 10px 20px;
+}
+
+#dark-mode {
+    margin: 10px;
+    text-align: center;
+}
+
+#theme-toggle {
+    background-color: var(--background-base);
+    border: solid 2px var(--background-blocked);
+    border-radius: 10px;
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+#theme-toggle:hover {
+    background-color: var(--background-highlight);
 }

@@ -1,0 +1,108 @@
+:root {
+    --background-base: #eceff4;
+    --background-highlight: #e5e9f0;
+    --background-blocked: #d8dee9;
+    --font-color: #2e3440;
+    --available-status: darkseagreen;
+    --unavailable-status: palevioletred;
+    /* --background-base: #434c5e;
+    --background-highlight: #3b4252;
+    --background-blocked: #2e3440;
+    --font-color: #d8dee9;
+    --available-status: seagreen;
+    --unavailable-status: indianred; */
+}
+
+* {
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0;
+    padding: 0;
+    color: var(--font-color);
+}
+
+body {
+    background-color: var(--background-base);
+}
+
+nav {
+    display: flex;
+    margin: 25px 0;
+    #nav{
+        margin: 0 auto;
+        user-select: none;
+    }
+}
+
+#weekly-cal {
+    display: flex;
+    gap: 20px;
+    div {
+        flex: 1 1 calc(100% / 6);
+        padding: 10px;
+        margin: 0 10px;
+        box-sizing: border-box;
+        h3 {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 22px;
+        }
+
+        ul {
+            li {
+                text-align: center;
+                padding: 10px;
+                margin: 7.5px 0;
+                border-radius: 10px;
+                background-color: var(--available-status);
+                cursor: pointer;
+                list-style: none;
+                font-size: 17px;
+            }
+            li.unavailable {
+                background-color: var(--unavailable-status);
+            }
+        }
+    }
+}
+
+#prevWeek {
+    pointer-events: none;
+    background-color: var(--background-blocked);
+    border: solid 2px var(--background-blocked);
+    border-radius: 10px;
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+#nextWeek {
+    pointer-events: none;
+    background-color: var(--background-blocked);
+    border: solid 2px var(--background-blocked);
+    border-radius: 10px;
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+#prevWeek.show {
+    pointer-events: all;
+    background-color: var(--background-base);
+}
+
+#nextWeek.show {
+    pointer-events: all;
+    background-color: var(--background-base);
+}
+
+#prevWeek.show:hover {
+    background-color: var(--background-highlight);
+}
+
+#nextWeek.show:hover {
+    background-color: var(--background-highlight);
+}
+
+#current-week {
+    border: solid 2px var(--background-blocked);
+    border-radius: 10px;
+    padding: 10px 20px;
+}

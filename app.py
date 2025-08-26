@@ -47,34 +47,25 @@ AVAILABILITY = [
     ]
 ]
 
-slot_id_count = 0
-time_slots = {}
-this_week = []
-
 DATABASE = 'scheduler.db'
-
 
 app = Flask(__name__)
 
+
 def get_db():
+    '''Returns Database'''
     db = getattr(g, '_database', None)
     if db is None:
         db = g._database = sqlite3.connect(DATABASE)
         db.row_factory = sqlite3.Row
     return db
 
-@app.teardown_appcontext
-def close_connection(exception):
-    db = getattr(g, '_database', None)
-    if db is not None:
-        db.close()
-
 def init_db():
+    '''Initializes Database Tables'''
     db = get_db()
     db.execute("""
         CREATE TABLE IF NOT EXISTS time_slots (
             id        INTEGER PRIMARY KEY AUTOINCREMENT,
-            date      TEXT NOT NULL,
             time      TEXT NOT NULL,
             ordinal   INTEGER NOT NULL,
             available INTEGER NOT NULL,
@@ -85,48 +76,55 @@ def init_db():
 
 
 def populate_dates(start_date, days=7):
+    '''Populate Table with Set Amount Days From Start Date. Default: 7'''
+    # Open Database Connection
     db = get_db()
+    # Create and Insert Time Slots for All Requested Days into Database
     for offset in range(days):
+        # Get Day and Ensure it is Within Scheduled Availability
         day = start_date + dt.timedelta(days=offset)
         weekday = day.weekday()
-
-        if weekday >= len(AVAILABILITY):  # skip if outside config
+        if weekday >= len(AVAILABILITY):
             continue
-
+        # Loop Over Available Slots Per Time and Insert Slots into Table
         for time_delta, capacity in AVAILABILITY[weekday]:
-            slot_date = day.isoformat()
             slot_time = day.replace(hour=0, minute=0, second=0) + time_delta
-
             for ordinal in range(capacity):
                 db.execute("""
-                    INSERT OR IGNORE INTO time_slots (date, time, ordinal, available)
-                    VALUES (?, ?, ?, 1)
-                """, (slot_date, slot_time, ordinal))
+                    INSERT OR IGNORE INTO time_slots (time, ordinal, available)
+                    VALUES (?, ?, 1)
+                """, (slot_time, ordinal))
     db.commit()
 
 
 @app.route('/')
 def default():
-    return render_template('index.html')
+    '''Default Root. Renders the HTML Template.'''
+    return render_template('index.html'), 200
 
 @app.route('/data')
 def data():
-    week_offset = int(request.args.get('week', 0))  # e.g. -1, 0, +1
+    '''Data Route. Fetch Data for Target Week.'''
+    # Get offset from request. Default to current week.
+    week_offset = int(request.args.get('week', 0))
+
+    # Get Current Week Start and Apply Offset to Calculate Target Week
     today = dt.date.today()
     this_week_start = today - dt.timedelta(days=today.weekday())
     target_start = this_week_start + dt.timedelta(weeks=week_offset)
     target_end = target_start + dt.timedelta(days=6)
 
+    # Open Database and Fetch Time Slots in Target Week.
     db = get_db()
     rows = db.execute("""
         SELECT * FROM time_slots
-        WHERE date BETWEEN ? AND ?
-        ORDER BY date, time, ordinal
+        WHERE time BETWEEN ? AND ?
+        ORDER BY time, ordinal
     """, (target_start.isoformat(), target_end.isoformat())).fetchall()
 
+    # Format and Return Data
     result = {
         row['id']: {
-            'date': row['date'],
             'time': row['time'],
             'ordinal': row['ordinal'],
             'available': bool(row['available'])
@@ -137,9 +135,14 @@ def data():
 
 @app.route('/data/time-slot', methods=['POST'])
 def update_time_slot():
+    '''Data Route. Update Time Slot Availability.'''
+    # Get ID from Request Body and Reformat It
     data = request.get_json()
     id = int(data.get('id').split('-')[1])
-    if (data.get('status') == 'False'):
+    status = data.get('status')
+
+    # Attempt to Update Status
+    if (status == 'False'):
         db = get_db()
         db.execute("""
                    UPDATE time_slots
@@ -147,8 +150,8 @@ def update_time_slot():
                    WHERE id = ?;
                    """, (id,))
         db.commit()
-        return f'good {data.get('id').split('-')[1]}'
-    elif (data.get('status') == 'True'):
+        return f'Set ID: {id} To Unavailable.', 201
+    elif (status == 'True'):
         db = get_db()
         db.execute("""
                    UPDATE time_slots
@@ -156,11 +159,19 @@ def update_time_slot():
                    WHERE id = ?;
                    """, (id,))
         db.commit()
-        return f'good {data.get('id').split('-')[1]}'
+        return f'Set ID: {id} To Available.', 201
     else:
-        return "Bad Input"
+        return f'Invalid Status! ID: {id} Unchanged.', 400
+
+@app.teardown_appcontext
+def close_connection(exception):
+    db = getattr(g, '_database', None)
+    if db is not None:
+        print(exception)
+        db.close()
 
 if __name__ == '__main__':
+    '''Application Entry Point'''
     with app.app_context():
         init_db()
         db = get_db()

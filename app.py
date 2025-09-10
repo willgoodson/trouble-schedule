@@ -1,11 +1,22 @@
-from flask import Flask, request, render_template, g, redirect
+from flask import Flask, request, render_template, g
 import datetime as dt
 import sqlite3
+import time
+import threading
 
 DATABASE = 'scheduler.db'
 
 app = Flask(__name__)
 
+def schedule_refresh():
+    '''Checks if it is currently the start of the week every 8 hours (3 times a day) and refreshes schedule if it is the start of the week.'''
+    while True:
+        day = dt.datetime.today().weekday()
+
+        if day == 0:
+            refresh_schedule(dt.datetime.today())
+
+        time.sleep(28800)
 
 def get_db():
     '''Returns Database'''
@@ -69,17 +80,19 @@ def populate_dates(start_date, days=7):
                 """, (start_time, ordinal))
     db.commit()
 
-def refresh_schedule(date):
+def refresh_schedule(date=dt.datetime.today()):
     db = get_db()
-    # db.execute("""
-    #            DELETE FROM schedules WHERE start < ?;
-    #            """, (date,))
+    today = dt.date.today()
+    this_week_start = today - dt.timedelta(days=today.weekday())
     db.execute("""
                DELETE FROM schedules WHERE end < ?;
                """, (dt.datetime.today().strftime("%Y-%m-%d"),))
     db.execute("""
                DELETE FROM time_slots WHERE time > ?;
                """, (date.strftime("%Y-%m-%d %H:%M:%S"),))
+    db.execute("""
+               DELETE FROM time_slots WHERE time < ?;
+               """, (this_week_start,))
     db.commit()
     populate_dates(dt.datetime.today(), 28)
 
@@ -189,6 +202,10 @@ if __name__ == '__main__':
     with app.app_context():
         init_db()
         db = get_db()
+        # If there are no days in database create them
         if db.execute('SELECT COUNT(*) FROM time_slots').fetchone()[0] == 0:
-            populate_dates(dt.datetime.today(), 28)
+            populate_dates(dt.datetime.today() - dt.timedelta(days=dt.datetime.today().weekday()), 28)
+        # Run schedule refreshing loop in thread
+        refresh_thread = threading.Thread(target=schedule_refresh, daemon=True)
+        refresh_thread.start()
     app.run(port='8000', debug=True)

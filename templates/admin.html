@@ -2,19 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Create Weekly Schedule</title>
+  <title>Admin Page</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    fieldset { margin-bottom: 20px; padding: 10px; border-radius: 8px; }
+    input[type='date'] {margin: 0 10px; background-color: #eceff4; padding: 10px 20px; border: solid 2px #d8dee9; border-radius: 10px;}
+    body { font-family: Arial, sans-serif; padding: 20px; background-color: #eceff4; color: #2e3440;}
+    fieldset { margin-bottom: 20px; padding: 10px; border-radius: 8px; border: solid 1.5px;}
     legend { font-weight: bold; }
     .slot { margin: 5px 0; }
-    select { margin-right: 10px; }
-    button { margin: 5px 0; }
+    select { margin-right: 10px; border: solid 2px #d8dee9; padding: 5px 10px; border-radius: 10px; background-color: #eceff4;}
+    button { margin: 5px 0; cursor: pointer; border: solid 2px #d8dee9; padding: 5px 10px; border-radius: 10px; background-color: #eceff4;}
+    button:hover {background-color: #e5e9f0;}
+    button[type='submit'] {padding: 10px 20px;}
+    form {margin: 20px 0}
   </style>
 </head>
 <body>
-  <h1>Create Weekly Schedule</h1>
-
+  <h1>Schedule Builder</h1>
   <label for="effective_date">Effective Date:</label>
   <input type="date" id="effective_date" required>
 
@@ -106,6 +109,8 @@
         return;
       }
 
+      alert('Schedule Submitted!');
+
       const schedule = {
         effective_date: effectiveDate,
         slots: []
@@ -129,7 +134,7 @@
         body: JSON.stringify(schedule)
       })
       .then(r => r.json())
-      .then(d => console.log("Server response:", d))
+      .then(d => {console.log("Server response:", d)})
       .catch(err => console.error("Error:", err));
     });
   </script>

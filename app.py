@@ -8,16 +8,6 @@ DATABASE = 'scheduler.db'
 
 app = Flask(__name__)
 
-def schedule_refresh():
-    '''Checks if it is currently the start of the week every 8 hours (3 times a day) and refreshes schedule if it is the start of the week.'''
-    while True:
-        day = dt.datetime.today().weekday()
-
-        if day == 0:
-            refresh_schedule(dt.datetime.today())
-
-        time.sleep(28800)
-
 def get_db():
     '''Returns Database'''
     db = getattr(g, '_database', None)
@@ -50,36 +40,6 @@ def init_db():
     """)
     db.commit()
 
-
-def populate_dates(start_date, days=7):
-    '''Populate Table with Set Amount Days From Start Date. Default: 7'''
-    # Open Database Connection
-    db = get_db()
-
-    # Create and Insert Time Slots for All Requested Days into Database
-    for offset in range(days):
-        day = start_date + dt.timedelta(days=offset)
-        weekday = day.weekday()
-
-        # Pull schedules for this weekday
-        rows = db.execute("""
-            SELECT ordinals, start, end
-            FROM schedules
-            WHERE weekday = ?
-            AND date(?) BETWEEN date(start) AND date(COALESCE(end, ?))
-        """, (weekday, day.date(), day.date())).fetchall()
-
-        # Loop Over Schedules and Create and Insert Time Slots into Database
-        for row in rows:
-            capacity, start_str, end_str = row
-            start_time = dt.datetime.combine(day, dt.datetime.fromisoformat(start_str).time())
-            for ordinal in range(capacity):
-                db.execute("""
-                    INSERT OR IGNORE INTO time_slots (time, ordinal, available)
-                    VALUES (?, ?, 1)
-                """, (start_time, ordinal))
-    db.commit()
-
 def refresh_schedule(date=dt.datetime.today()):
     db = get_db()
     today = dt.date.today()
@@ -92,10 +52,44 @@ def refresh_schedule(date=dt.datetime.today()):
                """, (date.strftime("%Y-%m-%d %H:%M:%S"),))
     db.execute("""
                DELETE FROM time_slots WHERE time < ?;
-               """, (this_week_start,))
+               """, (this_week_start.isoformat(),))
     db.commit()
-    populate_dates(dt.datetime.today(), 28)
 
+    for offset in range(28):
+        day = this_week_start + dt.timedelta(days=offset)
+        weekday = day.weekday()
+
+        # Pull schedules for this weekday
+        rows = db.execute("""
+            SELECT ordinals, start, end
+            FROM schedules
+            WHERE weekday = ?
+            AND date(?) BETWEEN date(start) AND date(COALESCE(end, ?))
+        """, (weekday, day.isoformat(), day.isoformat())).fetchall()
+
+        # Loop Over Schedules and Create and Insert Time Slots into Database
+        for row in rows:
+            capacity, start_str, end_str = row
+            start_time = dt.datetime.combine(day, dt.datetime.fromisoformat(start_str).time())
+            for ordinal in range(capacity):
+                db.execute("""
+                    INSERT OR IGNORE INTO time_slots (time, ordinal, available)
+                    VALUES (?, ?, 1)
+                """, (start_time.isoformat(), ordinal))
+    db.commit()
+
+
+def schedule_refresh():
+    '''Checks if it is currently the start of the week every 8 hours (3 times a day) and refreshes schedule if it is the start of the week.'''
+    with app.app_context():
+        refresh_schedule(dt.datetime.today())
+        while True:
+            day = dt.datetime.today().weekday()
+
+            if day == 0:
+                refresh_schedule(dt.datetime.today())
+
+            time.sleep(28800)
 
 @app.route('/')
 def default():
@@ -194,18 +188,12 @@ def update_time_slot():
 def close_connection(exception):
     db = getattr(g, '_database', None)
     if db is not None:
-        print(exception)
         db.close()
 
 if __name__ == '__main__':
     '''Application Entry Point'''
     with app.app_context():
         init_db()
-        db = get_db()
-        # If there are no days in database create them
-        if db.execute('SELECT COUNT(*) FROM time_slots').fetchone()[0] == 0:
-            populate_dates(dt.datetime.today() - dt.timedelta(days=dt.datetime.today().weekday()), 28)
-        # Run schedule refreshing loop in thread
-        refresh_thread = threading.Thread(target=schedule_refresh, daemon=True)
-        refresh_thread.start()
+    refresh_thread = threading.Thread(target=schedule_refresh, daemon=True)
+    refresh_thread.start()
     app.run(port='8000', debug=True)

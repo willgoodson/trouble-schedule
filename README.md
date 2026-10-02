@@ -49,7 +49,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-`scheduler.db` is created automatically on first run.
+`scheduler.db` is created automatically on first run. Set `FLASK_DEBUG=1` to turn on Flask's debug mode and auto-reload.
 
 - Calendar: http://localhost:8000
 - Admin: http://localhost:8000/admin
@@ -68,7 +68,6 @@ python app.py
 - [ ] Add a comments field to each time slot (for example, who booked it and why)
 - [ ] Replace 5-second polling with server push (Server-Sent Events or WebSockets) so it scales to more users
 - [ ] Prevent double-booking races: only mark a slot booked if it's still available
-- [ ] Add a production config (turn off `debug=True`, serve with gunicorn, read settings from environment variables)
-- [ ] Remove the unused `/api/test` route and fix the duplicated `UNIQUE(time, time, ordinal)` constraint
+- [ ] Add a production config (serve with gunicorn, read settings from environment variables)
 - [ ] Add tests for schedule generation (`refresh_schedule`)
 - [ ] Add a Dockerfile for one-command deployment

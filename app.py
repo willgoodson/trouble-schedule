@@ -1,5 +1,6 @@
 from flask import Flask, request, render_template, g
 import datetime as dt
+import os
 import sqlite3
 import time
 import threading
@@ -25,7 +26,7 @@ def init_db():
             time      TEXT NOT NULL,
             ordinal   INTEGER NOT NULL,
             available INTEGER NOT NULL,
-            UNIQUE(time, time, ordinal)
+            UNIQUE(time, ordinal)
         )
     """)
     db.execute("""
@@ -119,10 +120,6 @@ def admin_dash():
 
         return ('okay', 201)
 
-@app.route('/api/test', methods=['POST'])
-def test():
-    pass
-
 @app.route('/data')
 def data():
     '''Data Route. Fetch Data for Target Week.'''
@@ -196,4 +193,4 @@ if __name__ == '__main__':
         init_db()
     refresh_thread = threading.Thread(target=schedule_refresh, daemon=True)
     refresh_thread.start()
-    app.run(port='8000', debug=True)
+    app.run(port=8000, debug=os.environ.get('FLASK_DEBUG') == '1')
